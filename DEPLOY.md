@@ -44,16 +44,56 @@ Nos exemplos abaixo ele aparece como `203.0.113.45` — troque pelo seu.
 2. Clique em **ENTRAR** (canto superior direito)
 3. Entre com **CPF e senha**, ou pelo **gov.br** se foi assim que cadastrou
 
-### 1.2 Abrir a zona DNS do domínio
+### 1.2 Conferir se o domínio está ativo
 
 4. Você cai no **Painel**, com a lista dos seus domínios
 5. Clique em **casamento-eshileyejoaquim.com.br**
-6. Procure a seção **DNS**. O registro.br oferece DNS gratuito — é o que
-   vamos usar, não precisa contratar nada à parte
-7. Clique em **Editar Zona** (em alguns painéis aparece como *Editar zona
-   DNS* ou dentro de *Modo avançado*)
 
-### 1.3 Criar os dois registros
+Antes de mexer em DNS, olhe o **status** do domínio no topo:
+
+| Status | O que fazer |
+|---|---|
+| **Ativo** / *Publicado* | pode seguir |
+| *Aguardando pagamento* | pague o boleto/Pix primeiro — o DNS não funciona antes |
+| *Em processamento* | espere; costuma levar poucas horas |
+
+### 1.3 Entender as duas telas parecidas (a confusão mais comum)
+
+O registro.br tem **duas** coisas com nome de DNS, e é fácil errar:
+
+- **Servidores DNS** (ou *delegação*, *NS*) — diz **quem responde** pelo
+  domínio. Serve para quem usa Cloudflare, a própria Hostinger etc.
+- **Zona DNS** (ou *Editar zona*, *registros*) — os **endereços em si**:
+  é aqui que vai o `A` apontando para o IP.
+
+**Nós vamos usar a Zona DNS do próprio registro.br**, que é gratuita.
+Você **não precisa** mexer em Servidores DNS, nem contratar DNS na
+Hostinger.
+
+> Se a tela avisar que o domínio está usando servidores DNS externos (algo
+> diferente de `a.auto.dns.br` / `b.auto.dns.br`), me mande o print antes
+> de mudar qualquer coisa — nesse caso os registros vão em outro lugar.
+
+### 1.4 Abrir o editor da zona
+
+6. Procure a seção **DNS** dentro da página do domínio
+7. Clique em **Editar Zona** (aparece também como *Editar zona DNS*,
+   *Gerenciar zona* ou dentro de **Modo avançado**)
+
+O editor costuma ter dois formatos, dependendo da conta:
+
+- **Formulário**: colunas Nome / Tipo / Dados, com um botão `+`
+- **Texto livre**: uma caixa onde você digita os registros direto, um por
+  linha. Nesse caso, o conteúdo é exatamente:
+
+  ```
+  @    A    203.0.113.45
+  www  A    203.0.113.45
+  ```
+
+  (trocando pelo IP do seu VPS)
+
+### 1.5 Criar os dois registros
 
 Você verá uma tabela vazia com colunas parecidas com
 **Nome / Tipo / Dados** (ou *Valor*).
@@ -80,11 +120,18 @@ Clique em adicionar/`+` para abrir uma nova linha.
 
 8. Clique em **Salvar** / **Salvar alterações**
 
-> Só isso. Não mexa em `NS`, `MX` ou `TXT`. Se o painel avisar que a zona
-> tem erros, confira se o campo Nome do primeiro registro está mesmo vazio
-> e se o IP não tem espaço sobrando.
+Não mexa em `NS`, `MX` ou `TXT`.
 
-### 1.4 Esperar propagar e conferir
+**Se der erro ao salvar**, quase sempre é um destes:
+
+| Erro | Causa |
+|---|---|
+| "registro inválido" no primeiro | o campo Nome não aceitou vazio — use `@` |
+| "valor inválido" | espaço sobrando antes/depois do IP, ou IP digitado errado |
+| "zona com erros" | o tipo ficou em `AAAA` (que é para IPv6) em vez de `A` |
+| nada acontece ao salvar | falta clicar em *adicionar* na linha antes de salvar |
+
+### 1.6 Esperar propagar e conferir
 
 A mudança leva de alguns minutos a algumas horas. Confira do seu PC:
 
