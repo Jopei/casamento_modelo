@@ -57,28 +57,41 @@ Antes de mexer em DNS, olhe o **status** do domínio no topo:
 | *Aguardando pagamento* | pague o boleto/Pix primeiro — o DNS não funciona antes |
 | *Em processamento* | espere; costuma levar poucas horas |
 
-### 1.3 Entender as duas telas parecidas (a confusão mais comum)
+### 1.3 A tela errada (é aqui que quase todo mundo erra)
 
-O registro.br tem **duas** coisas com nome de DNS, e é fácil errar:
+Na página do domínio existe uma seção **DNS**. Dentro dela há painéis
+recolhidos, cada um com uma setinha `>`. Um deles é:
 
-- **Servidores DNS** (ou *delegação*, *NS*) — diz **quem responde** pelo
-  domínio. Serve para quem usa Cloudflare, a própria Hostinger etc.
-- **Zona DNS** (ou *Editar zona*, *registros*) — os **endereços em si**:
-  é aqui que vai o `A` apontando para o IP.
+> **ALTERAR SERVIDORES DNS** — com os campos *Servidor 1*, *Servidor 2*
+> e os botões *+ DNSSEC* / *+ DNS*
 
-**Nós vamos usar a Zona DNS do próprio registro.br**, que é gratuita.
-Você **não precisa** mexer em Servidores DNS, nem contratar DNS na
-Hostinger.
+**Não é aqui.** Essa tela define *quem responde* pelo domínio (delegação).
+Preencher ali tira o DNS do registro.br e derruba o domínio até você
+desfazer. Se abriu por engano, feche no **X** sem salvar.
 
-> Se a tela avisar que o domínio está usando servidores DNS externos (algo
-> diferente de `a.auto.dns.br` / `b.auto.dns.br`), me mande o print antes
-> de mudar qualquer coisa — nesse caso os registros vão em outro lugar.
+Logo acima dos painéis deve aparecer:
 
-### 1.4 Abrir o editor da zona
+> ✅ **Você está utilizando os servidores DNS do Registro.br**
 
-6. Procure a seção **DNS** dentro da página do domínio
-7. Clique em **Editar Zona** (aparece também como *Editar zona DNS*,
-   *Gerenciar zona* ou dentro de **Modo avançado**)
+Esse é o estado certo, e é o que permite editar a zona ali mesmo, de
+graça. **Não mude.** Não é preciso contratar DNS na Hostinger.
+
+### 1.4 Abrir o editor da zona (a tela certa)
+
+6. Na seção **DNS**, com o painel de servidores fechado, procure outro
+   painel recolhido — mesma aparência, com a setinha `>` à esquerda
+7. Clique em **EDITAR ZONA** (pode aparecer como *ZONA DNS* ou
+   *REGISTROS*)
+
+A diferença na prática:
+
+| Painel | Campos que aparecem | É o certo? |
+|---|---|---|
+| ALTERAR SERVIDORES DNS | Servidor 1, Servidor 2 | ❌ não |
+| EDITAR ZONA | Nome, Tipo, Dados/Valor | ✅ sim |
+
+Se ao abrir aparecerem os campos **Servidor 1 / Servidor 2**, você está no
+painel errado — feche e procure o outro.
 
 O editor costuma ter dois formatos, dependendo da conta:
 
