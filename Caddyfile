@@ -1,0 +1,32 @@
+# HTTPS automatico via Let's Encrypt. O Caddy emite e renova o certificado
+# sozinho, desde que o dominio ja aponte para o IP deste servidor e as
+# portas 80 e 443 estejam abertas.
+#
+# O e-mail recebe os avisos de expiracao da Let's Encrypt.
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
+	# O nginx do container "web" serve o site e a API na mesma origem.
+	reverse_proxy web:80
+
+	# Fotos do casamento passam por aqui no envio pelo painel.
+	request_body {
+		max_size 25MB
+	}
+
+	header {
+		# Evita que o navegador tente adivinhar o tipo dos arquivos.
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/acesso.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+	}
+}

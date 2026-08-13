@@ -1,0 +1,21 @@
+# Senhas do banco lidas pelo docker-compose.prod.yml
+.env
+
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/.phpunit.result.cache
+backend/storage/*.key
+backend/storage/logs/*.log
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/app/public/*
+!backend/storage/app/public/.gitignore
+backend/public/storage
+
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+.DS_Store

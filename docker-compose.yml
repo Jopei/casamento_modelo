@@ -1,0 +1,65 @@
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: casamento_backend
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - db
+    networks:
+      - casamento-network
+
+  web:
+    image: nginx:alpine
+    container_name: casamento_nginx
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - casamento-network
+
+  db:
+    image: mysql:8.0
+    container_name: casamento_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: casamento
+      MYSQL_USER: casamento_user
+      MYSQL_PASSWORD: casamento_pass
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3310:3306"
+    networks:
+      - casamento-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: casamento_frontend
+    restart: unless-stopped
+    ports:
+      - "5174:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    networks:
+      - casamento-network
+
+networks:
+  casamento-network:
+
+volumes:
+  db_data:

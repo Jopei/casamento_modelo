@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #b8975a;
+  --color-gold-light: #d4af7a;
+  --color-champagne: #f2e8d9;
+  --color-beige: #f5f0e6;
+  --color-offwhite: #fdfbf7;
+  --color-brown: #6b5b45;
+
+  --font-script: "Great Vibes", cursive;
+  --font-serif: "Cormorant Garamond", serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-serif);
+  background-color: var(--color-offwhite);
+  color: var(--color-brown);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 500;
+}
+
+/* O botao nativo do input de arquivo tem cerca de 20px de altura, pequeno
+   demais para o dedo. Aqui ele vira um alvo de 44px, o minimo recomendado
+   para toque, sem perder o comportamento nativo de escolher arquivo. */
+.admin-file {
+  width: 100%;
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--color-brown) 60%, transparent);
+}
+
+.admin-file::file-selector-button {
+  margin-right: 0.75rem;
+  min-height: 44px;
+  padding-inline: 1rem;
+  border: 0;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--color-gold) 12%, transparent);
+  color: var(--color-gold);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+/* Acoes em lista (Editar / Remover): no desktop sao links discretos, no
+   celular precisam de area de toque. */
+.admin-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+}
+
+.admin-action:hover {
+  background-color: color-mix(in srgb, var(--color-brown) 6%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .admin-action {
+    min-height: 0;
+    padding-inline: 0;
+  }
+  .admin-action:hover {
+    background-color: transparent;
+    text-decoration: underline;
+  }
+}
