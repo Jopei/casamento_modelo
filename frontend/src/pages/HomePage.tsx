@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
 import { Hero } from "../components/landing/Hero";
 import { Gallery } from "../components/landing/Gallery";
+import { Story } from "../components/landing/Story";
+import { Countdown } from "../components/landing/Countdown";
 import { fetchGallery, commentOnPhoto, downloadPhoto, likePhoto, unlikePhoto } from "../api/gallery";
+import { fetchStory } from "../api/story";
 import { useGuestAuth } from "../context/GuestAuthContext";
 import { usePublicSettings } from "../layouts/PublicLayout";
-import type { Photo } from "../types";
+import type { Photo, StoryItem } from "../types";
 
 export function HomePage() {
   const settings = usePublicSettings();
   const { ensureIdentified } = useGuestAuth();
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [story, setStory] = useState<StoryItem[]>([]);
 
   useEffect(() => {
     fetchGallery().then(setPhotos);
+    fetchStory().then(setStory);
   }, []);
 
   /** false quando o convidado fecha o modal sem se identificar. */
@@ -91,6 +96,8 @@ export function HomePage() {
         onDownload={handleDownload}
         onComment={handleComment}
       />
+      <Story items={story} />
+      <Countdown targetDate={settings.wedding_date} />
     </>
   );
 }
