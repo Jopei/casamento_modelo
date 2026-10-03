@@ -31,6 +31,18 @@ function GiftPlaceholder() {
 
 export function GiftCard({ gift, pending, onReserve }: GiftCardProps) {
   const disabled = pending || !gift.is_available;
+  const givenBy = gift.given_by ?? [];
+  const givenByText =
+    givenBy.length > 0 ? `Presente de ${givenBy.join(", ")}` : "";
+  // Uma unica linha de altura fixa: com unidades sobrando mostra "Restam...",
+  // esgotado mostra quem deu. Valor livre: nomes se houver, senao "Voce escolhe quanto".
+  const infoText = gift.is_free_amount
+    ? givenByText || "Voce escolhe quanto"
+    : !gift.is_available && givenByText
+      ? givenByText
+      : gift.quantity > 1
+        ? `Restam ${gift.available_count} de ${gift.quantity}`
+        : givenByText;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-3xl bg-white shadow-md">
@@ -61,12 +73,11 @@ export function GiftCard({ gift, pending, onReserve }: GiftCardProps) {
         </p>
 
         {/* Espaco reservado mesmo sem texto, para os cards nao desalinharem. */}
-        <p className="mt-1 min-h-[1.25rem] text-xs text-brown/50">
-          {gift.is_free_amount
-            ? "Voce escolhe quanto"
-            : gift.quantity > 1
-              ? `Restam ${gift.available_count} de ${gift.quantity}`
-              : ""}
+        <p
+          title={infoText}
+          className="mt-1 min-h-[1.25rem] truncate text-xs text-brown/50"
+        >
+          {infoText}
         </p>
 
         <div className="mt-auto pt-4">

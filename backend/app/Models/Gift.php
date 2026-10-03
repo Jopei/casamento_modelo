@@ -30,6 +30,19 @@ class Gift extends Model
     }
 
     /**
+     * Eager load restrito as reservas que optaram por exibir o nome
+     * (usado em given_by); nao afeta reservations_count do withCount.
+     */
+    public static function givenByRelation(): array
+    {
+        return [
+            'reservations' => fn ($q) => $q->where('show_name', true)
+                ->orderBy('reserved_at')
+                ->with('guest:id,name'),
+        ];
+    }
+
+    /**
      * Usa reservations_count quando a relacao ja foi contada na query,
      * evitando um SELECT por presente na listagem.
      */

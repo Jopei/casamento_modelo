@@ -71,6 +71,8 @@ export interface Gift {
   reserved_count: number;
   available_count: number;
   is_available: boolean;
+  /** Nomes dos convidados que optaram por aparecer no site. */
+  given_by: string[];
 }
 
 export type ReservationStatus = "pending" | "paid";
@@ -81,6 +83,7 @@ export interface GiftReservationResult {
   status: ReservationStatus;
   /** Copia e cola do PIX. Nulo quando o casal ainda nao cadastrou a chave. */
   pix_payload: string | null;
+  show_name: boolean;
 }
 
 export interface Guest {
@@ -106,4 +109,6 @@ export interface GiftReservation {
   status: ReservationStatus;
   reserved_at: string;
   paid_at: string | null;
+  /** false = surpresa (nome oculto no site). */
+  show_name: boolean;
 }

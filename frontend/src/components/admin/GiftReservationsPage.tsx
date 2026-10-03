@@ -7,6 +7,14 @@ import {
 import { formatCurrency } from "../../lib/format";
 import type { GiftReservation } from "../../types";
 
+function NameVisibility({ showName }: { showName: boolean }) {
+  return (
+    <span className="ml-2 whitespace-nowrap rounded-full bg-brown/5 px-2 py-0.5 text-[0.65rem] text-brown/50">
+      {showName ? "Nome no site" : "Surpresa"}
+    </span>
+  );
+}
+
 export function GiftReservationsPage() {
   const [reservations, setReservations] = useState<GiftReservation[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -90,6 +98,7 @@ export function GiftReservationsPage() {
                 </p>
                 <p className="text-sm text-brown/70">
                   {reservation.guest.name}
+                  <NameVisibility showName={reservation.show_name} />
                 </p>
                 <a
                   href={`tel:${reservation.guest.phone}`}
@@ -165,6 +174,7 @@ export function GiftReservationsPage() {
                   </td>
                   <td className="px-4 py-3 text-brown/70">
                     {reservation.guest.name}
+                    <NameVisibility showName={reservation.show_name} />
                   </td>
                   <td className="px-4 py-3 text-brown/70">
                     {reservation.guest.phone}

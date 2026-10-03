@@ -247,6 +247,86 @@ class GiftReservationTest extends TestCase
         $this->assertArrayNotHasKey('reservations', $response->json('data.0'));
     }
 
+    public function test_name_is_hidden_by_default(): void
+    {
+        $gift = $this->gift();
+
+        $this->actingAs($this->guest('Joao Secreto'), 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve")
+            ->assertOk()
+            ->assertJsonPath('reservation.show_name', false)
+            ->assertJsonPath('gift.given_by', []);
+
+        $response = $this->getJson('/api/gifts')->assertOk();
+        $this->assertSame([], $response->json('data.0.given_by'));
+        $this->assertStringNotContainsString('Joao Secreto', $response->getContent());
+        $this->assertDatabaseHas('gift_reservations', ['show_name' => false]);
+    }
+
+    public function test_name_is_listed_when_guest_opts_in(): void
+    {
+        $gift = $this->gift();
+
+        $this->actingAs($this->guest('Maria Feliz', '11988887777'), 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => true])
+            ->assertOk()
+            ->assertJsonPath('reservation.show_name', true)
+            ->assertJsonPath('gift.given_by', ['Maria Feliz'])
+            ->assertJsonPath('gift.reserved_count', 1);
+
+        $response = $this->getJson('/api/gifts')->assertOk();
+        $this->assertSame(['Maria Feliz'], $response->json('data.0.given_by'));
+        $this->assertSame(1, $response->json('data.0.reserved_count'));
+        $this->assertStringNotContainsString('11988887777', $response->getContent());
+    }
+
+    public function test_only_guests_who_opted_in_appear_in_given_by(): void
+    {
+        $gift = $this->gift(['quantity' => 2]);
+
+        $this->actingAs($this->guest('Anonimo', '11999990001'), 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => false])
+            ->assertOk();
+        $this->actingAs($this->guest('Visivel', '11999990002'), 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => true])
+            ->assertOk()
+            ->assertJsonPath('gift.given_by', ['Visivel']);
+
+        $response = $this->getJson('/api/gifts')->assertOk();
+        $this->assertSame(['Visivel'], $response->json('data.0.given_by'));
+        $this->assertSame(2, $response->json('data.0.reserved_count'));
+        $this->assertStringNotContainsString('Anonimo', $response->getContent());
+    }
+
+    public function test_free_amount_repeat_contribution_updates_show_name(): void
+    {
+        $gift = $this->gift(['is_free_amount' => true, 'price' => null]);
+        $guest = $this->guest('Carlos');
+
+        $this->actingAs($guest, 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 50, 'show_name' => true])
+            ->assertOk()
+            ->assertJsonPath('gift.given_by', ['Carlos']);
+
+        $this->actingAs($guest, 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 10, 'show_name' => false])
+            ->assertOk()
+            ->assertJsonPath('reservation.show_name', false)
+            ->assertJsonPath('gift.given_by', []);
+
+        $this->assertSame([], $this->getJson('/api/gifts')->json('data.0.given_by'));
+    }
+
+    public function test_show_name_must_be_boolean(): void
+    {
+        $gift = $this->gift();
+
+        $this->actingAs($this->guest(), 'guest')
+            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => 'talvez'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('show_name');
+    }
+
     public function test_public_settings_never_expose_the_pix_key(): void
     {
         WeddingSetting::current()->update([

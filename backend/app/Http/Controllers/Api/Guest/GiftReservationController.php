@@ -18,8 +18,9 @@ class GiftReservationController extends Controller
     public function store(StoreGiftReservationRequest $request, Gift $gift)
     {
         $guest = $request->user('guest');
+        $showName = $request->boolean('show_name');
 
-        $reservation = DB::transaction(function () use ($request, $gift, $guest) {
+        $reservation = DB::transaction(function () use ($request, $gift, $guest, $showName) {
             $locked = Gift::whereKey($gift->id)->lockForUpdate()->firstOrFail();
 
             $alreadyChosen = $locked->reservations()
@@ -49,6 +50,7 @@ class GiftReservationController extends Controller
                     'amount' => (float) $existing->amount + $amount,
                     'status' => GiftReservation::STATUS_PENDING,
                     'reserved_at' => now(),
+                    'show_name' => $showName,
                 ]);
 
                 return $existing->fresh();
@@ -60,11 +62,16 @@ class GiftReservationController extends Controller
                 'amount' => $amount,
                 'status' => GiftReservation::STATUS_PENDING,
                 'reserved_at' => now(),
+                'show_name' => $showName,
             ]);
         });
 
         return response()->json([
-            'gift' => new GiftResource($gift->fresh()->loadCount('reservations')),
+            'gift' => new GiftResource(
+                Gift::withCount('reservations')
+                    ->with(Gift::givenByRelation())
+                    ->findOrFail($gift->id)
+            ),
             'reservation' => $this->reservationPayload($reservation),
         ]);
     }
@@ -96,6 +103,7 @@ class GiftReservationController extends Controller
             'id' => $reservation->id,
             'amount' => $reservation->amount,
             'status' => $reservation->status,
+            'show_name' => (bool) $reservation->show_name,
             'pix_payload' => PixPayload::forSettings(
                 WeddingSetting::current(),
                 $amount,

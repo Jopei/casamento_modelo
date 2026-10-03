@@ -25,6 +25,7 @@ class StoreGiftReservationRequest extends FormRequest
                 'min:1',
                 'max:999999.99',
             ],
+            'show_name' => ['sometimes', 'boolean'],
         ];
     }
 

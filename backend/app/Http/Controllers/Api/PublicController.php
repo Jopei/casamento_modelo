@@ -47,6 +47,7 @@ class PublicController extends Controller
     {
         return GiftResource::collection(
             Gift::withCount('reservations')
+                ->with(Gift::givenByRelation())
                 // Presentes de valor livre ficam no fim da lista.
                 ->orderBy('is_free_amount')
                 ->orderBy('name')

@@ -27,7 +27,7 @@ export function GiftList({
           className="mb-10 text-center md:mb-16"
         >
           <span className="font-script text-3xl text-gold md:text-4xl">
-            Lista de Presentes
+            Presentes que gostariamos de ganhar
           </span>
           <p className="mt-3 text-brown/70">
             Sua presenca ja e o maior presente. Se desejar nos presentear,

@@ -15,6 +15,7 @@ class GiftReservation extends Model
         'guest_id',
         'amount',
         'status',
+        'show_name',
         'reserved_at',
         'paid_at',
     ];
@@ -23,6 +24,7 @@ class GiftReservation extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'show_name' => 'boolean',
             'reserved_at' => 'datetime',
             'paid_at' => 'datetime',
         ];

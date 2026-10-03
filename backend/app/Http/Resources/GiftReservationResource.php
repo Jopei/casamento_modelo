@@ -22,6 +22,7 @@ class GiftReservationResource extends JsonResource
             ],
             'amount' => $this->amount,
             'status' => $this->status,
+            'show_name' => (bool) $this->show_name,
             'reserved_at' => $this->reserved_at,
             'paid_at' => $this->paid_at,
         ];

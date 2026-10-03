@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { GiftList } from "../components/landing/GiftList";
 import { GiftAmountModal } from "../components/landing/GiftAmountModal";
+import { GiftSurpriseModal } from "../components/landing/GiftSurpriseModal";
 import { GiftPixModal } from "../components/landing/GiftPixModal";
 import { fetchGifts, releaseGift, reserveGift } from "../api/gifts";
 import { useGuestAuth } from "../context/GuestAuthContext";
@@ -12,7 +13,13 @@ export function GiftsPage() {
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [pendingGiftId, setPendingGiftId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [askingAmountFor, setAskingAmountFor] = useState<Gift | null>(null);
+  const [askingSurpriseFor, setAskingSurpriseFor] = useState<Gift | null>(
+    null,
+  );
+  const [askingAmountFor, setAskingAmountFor] = useState<{
+    gift: Gift;
+    showName: boolean;
+  } | null>(null);
   const [selected, setSelected] = useState<{
     gift: Gift;
     reservation: GiftReservationResult;
@@ -24,7 +31,11 @@ export function GiftsPage() {
     load();
   }, [load]);
 
-  const reserve = async (gift: Gift, amount?: number) => {
+  const reserve = async (
+    gift: Gift,
+    showName: boolean,
+    amount?: number,
+  ) => {
     setError(null);
 
     try {
@@ -37,7 +48,10 @@ export function GiftsPage() {
     setPendingGiftId(gift.id);
 
     try {
-      const { gift: updated, reservation } = await reserveGift(gift.id, amount);
+      const { gift: updated, reservation } = await reserveGift(gift.id, {
+        amount,
+        showName,
+      });
 
       setGifts((current) =>
         current.map((item) => (item.id === gift.id ? updated : item)),
@@ -60,18 +74,26 @@ export function GiftsPage() {
   const handleReserveGift = (gift: Gift) => {
     if (!gift.is_available) return;
 
+    setAskingSurpriseFor(gift);
+  };
+
+  const handleChooseSurprise = (showName: boolean) => {
+    const gift = askingSurpriseFor;
+    setAskingSurpriseFor(null);
+    if (!gift) return;
+
     if (gift.is_free_amount) {
-      setAskingAmountFor(gift);
+      setAskingAmountFor({ gift, showName });
       return;
     }
 
-    reserve(gift);
+    reserve(gift, showName);
   };
 
   const handleConfirmAmount = (amount: number) => {
-    const gift = askingAmountFor;
+    const asking = askingAmountFor;
     setAskingAmountFor(null);
-    if (gift) reserve(gift, amount);
+    if (asking) reserve(asking.gift, asking.showName, amount);
   };
 
   const handleCancelReservation = async () => {
@@ -90,8 +112,13 @@ export function GiftsPage() {
         pendingGiftId={pendingGiftId}
         onReserve={handleReserveGift}
       />
+      <GiftSurpriseModal
+        gift={askingSurpriseFor}
+        onClose={() => setAskingSurpriseFor(null)}
+        onChoose={handleChooseSurprise}
+      />
       <GiftAmountModal
-        gift={askingAmountFor}
+        gift={askingAmountFor?.gift ?? null}
         onClose={() => setAskingAmountFor(null)}
         onConfirm={handleConfirmAmount}
       />

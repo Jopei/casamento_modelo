@@ -21,6 +21,16 @@ class GiftResource extends JsonResource
             'reserved_count' => $this->reserved_count,
             'available_count' => $this->available_count,
             'is_available' => $this->is_available,
+            // Somente quem optou por aparecer (show_name); nunca telefone.
+            'given_by' => $this->relationLoaded('reservations')
+                ? $this->reservations
+                    ->where('show_name', true)
+                    ->sortBy('reserved_at')
+                    ->map(fn ($r) => $r->guest?->name)
+                    ->filter()
+                    ->values()
+                    ->all()
+                : [],
         ];
     }
 }
