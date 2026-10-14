@@ -7,6 +7,7 @@ use App\Http\Resources\GiftReservationResource;
 use App\Models\GiftReservation;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class GiftReservationController extends Controller
 {
@@ -22,6 +23,12 @@ class GiftReservationController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in([GiftReservation::STATUS_PENDING, GiftReservation::STATUS_PAID])],
         ]);
+
+        if ($giftReservation->status === GiftReservation::STATUS_RESERVED) {
+            throw ValidationException::withMessages([
+                'status' => 'Reserva sem pagamento nao pode ser marcada como paga.',
+            ]);
+        }
 
         $paid = $validated['status'] === GiftReservation::STATUS_PAID;
 

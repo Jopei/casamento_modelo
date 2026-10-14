@@ -7,6 +7,21 @@ import {
 import { formatCurrency } from "../../lib/format";
 import type { GiftReservation } from "../../types";
 
+const STATUS_LABEL: Record<GiftReservation["status"], string> = {
+  reserved: "Reservado",
+  pending: "Pendente",
+  paid: "Pago",
+};
+
+function PhoneCell({ phone }: { phone: string | null }) {
+  if (!phone) return <span className="text-sm text-brown/60">-</span>;
+  return (
+    <a href={`tel:${phone}`} className="text-sm text-brown/60 underline">
+      {phone}
+    </a>
+  );
+}
+
 function NameVisibility({ showName }: { showName: boolean }) {
   return (
     <span className="ml-2 whitespace-nowrap rounded-full bg-brown/5 px-2 py-0.5 text-[0.65rem] text-brown/50">
@@ -49,7 +64,7 @@ export function GiftReservationsPage() {
 
   const handleRelease = async (reservation: GiftReservation) => {
     const confirmed = window.confirm(
-      `Liberar "${reservation.gift.name}" reservado por ${reservation.guest.name}? O presente volta para a lista.`,
+      `Liberar "${reservation.gift.name}" reservado por ${reservation.giver_name ?? "convidado sem nome"}? O presente volta para a lista.`,
     );
     if (!confirmed) return;
 
@@ -97,15 +112,10 @@ export function GiftReservationsPage() {
                   {reservation.gift.name}
                 </p>
                 <p className="text-sm text-brown/70">
-                  {reservation.guest.name}
+                  {reservation.giver_name ?? "Sem nome"}
                   <NameVisibility showName={reservation.show_name} />
                 </p>
-                <a
-                  href={`tel:${reservation.guest.phone}`}
-                  className="text-sm text-brown/60 underline"
-                >
-                  {reservation.guest.phone}
-                </a>
+                <PhoneCell phone={reservation.phone} />
               </div>
               <span
                 className={`shrink-0 rounded-full px-3 py-1 text-xs ${
@@ -114,7 +124,7 @@ export function GiftReservationsPage() {
                     : "bg-brown/10 text-brown/60"
                 }`}
               >
-                {reservation.status === "paid" ? "Pago" : "Pendente"}
+                {STATUS_LABEL[reservation.status]}
               </span>
             </div>
 
@@ -128,13 +138,15 @@ export function GiftReservationsPage() {
             </div>
 
             <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => handleToggleStatus(reservation)}
-                disabled={busyId === reservation.id}
-                className="min-h-11 flex-1 rounded-full bg-gold px-4 text-sm text-offwhite disabled:opacity-50"
-              >
-                {reservation.status === "paid" ? "Desmarcar" : "Marcar pago"}
-              </button>
+              {reservation.status !== "reserved" && (
+                <button
+                  onClick={() => handleToggleStatus(reservation)}
+                  disabled={busyId === reservation.id}
+                  className="min-h-11 flex-1 rounded-full bg-gold px-4 text-sm text-offwhite disabled:opacity-50"
+                >
+                  {reservation.status === "paid" ? "Desmarcar" : "Marcar pago"}
+                </button>
+              )}
               <button
                 onClick={() => handleRelease(reservation)}
                 disabled={busyId === reservation.id}
@@ -173,11 +185,11 @@ export function GiftReservationsPage() {
                     {reservation.gift.name}
                   </td>
                   <td className="px-4 py-3 text-brown/70">
-                    {reservation.guest.name}
+                    {reservation.giver_name ?? "Sem nome"}
                     <NameVisibility showName={reservation.show_name} />
                   </td>
                   <td className="px-4 py-3 text-brown/70">
-                    {reservation.guest.phone}
+                    <PhoneCell phone={reservation.phone} />
                   </td>
                   <td className="px-4 py-3 text-brown/70">
                     {formatCurrency(reservation.amount)}
@@ -190,7 +202,7 @@ export function GiftReservationsPage() {
                           : "bg-brown/10 text-brown/60"
                       }`}
                     >
-                      {reservation.status === "paid" ? "Pago" : "Pendente"}
+                      {STATUS_LABEL[reservation.status]}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-brown/70">
@@ -200,15 +212,17 @@ export function GiftReservationsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-3">
-                      <button
-                        onClick={() => handleToggleStatus(reservation)}
-                        disabled={busyId === reservation.id}
-                        className="text-brown/70 hover:underline disabled:opacity-50"
-                      >
-                        {reservation.status === "paid"
-                          ? "Desmarcar"
-                          : "Marcar pago"}
-                      </button>
+                      {reservation.status !== "reserved" && (
+                        <button
+                          onClick={() => handleToggleStatus(reservation)}
+                          disabled={busyId === reservation.id}
+                          className="text-brown/70 hover:underline disabled:opacity-50"
+                        >
+                          {reservation.status === "paid"
+                            ? "Desmarcar"
+                            : "Marcar pago"}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleRelease(reservation)}
                         disabled={busyId === reservation.id}

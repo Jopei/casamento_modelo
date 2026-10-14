@@ -2,16 +2,25 @@
 
 namespace Tests\Feature;
 
+use App\Models\Admin;
 use App\Models\Gift;
 use App\Models\GiftReservation;
 use App\Models\Guest;
 use App\Models\WeddingSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class GiftReservationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        RateLimiter::clear('gift-reserve-min:127.0.0.1');
+        RateLimiter::clear('gift-reserve-hour:127.0.0.1');
+    }
 
     private function gift(array $attributes = []): Gift
     {
@@ -22,142 +31,256 @@ class GiftReservationTest extends TestCase
         ]);
     }
 
-    private function guest(string $name = 'Joao', string $phone = '11999998888'): Guest
+    private function freeGift(): Gift
     {
-        return Guest::create(['name' => $name, 'phone' => $phone]);
+        return $this->gift(['is_free_amount' => true, 'price' => null, 'quantity' => 1]);
     }
 
-    public function test_guest_can_reserve_an_available_gift(): void
+    private function reserve(Gift $gift, array $body = [])
     {
-        $gift = $this->gift();
-        $guest = $this->guest();
+        return $this->postJson("/api/gifts/{$gift->id}/reserve", $body);
+    }
 
-        $this->actingAs($guest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertOk()
-            ->assertJsonPath('gift.is_available', false)
-            ->assertJsonPath('gift.reserved_count', 1)
-            ->assertJsonPath('reservation.amount', '250.00')
-            ->assertJsonPath('reservation.status', 'pending');
+    private function legacy(Gift $gift, bool $showName = true): GiftReservation
+    {
+        $guest = Guest::create(['name' => 'Tia Legada', 'phone' => '11977776666']);
 
-        $this->assertDatabaseHas('gift_reservations', [
+        return GiftReservation::create([
             'gift_id' => $gift->id,
             'guest_id' => $guest->id,
-            'amount' => 250.00,
+            'amount' => 250,
             'status' => 'pending',
+            'reserved_at' => now(),
+            'show_name' => $showName,
         ]);
     }
 
-    public function test_second_guest_cannot_reserve_an_already_reserved_gift(): void
+    private function admin(): Admin
+    {
+        return Admin::create(['name' => 'Admin', 'email' => 'admin@casamento.com', 'password' => 'password']);
+    }
+
+    public function test_anonymous_reservation_without_name(): void
     {
         $gift = $this->gift();
-        $firstGuest = $this->guest();
-        $secondGuest = $this->guest('Maria', '11999997777');
 
-        $this->actingAs($firstGuest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertOk();
+        $this->reserve($gift)
+            ->assertOk()
+            ->assertJsonPath('gift.is_available', false)
+            ->assertJsonPath('reservation.status', 'reserved')
+            ->assertJsonPath('reservation.amount', '250.00')
+            ->assertJsonPath('reservation.pix_payload', null)
+            ->assertJsonPath('reservation.giver_name', null)
+            ->assertJsonPath('reservation.show_name', false)
+            ->assertJsonStructure(['reservation' => ['id', 'cancel_token']]);
 
-        $this->actingAs($secondGuest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertStatus(409);
+        $this->assertDatabaseHas('gift_reservations', [
+            'gift_id' => $gift->id,
+            'guest_id' => null,
+            'status' => 'reserved',
+        ]);
+    }
+
+    public function test_bearer_of_a_guest_is_ignored(): void
+    {
+        $gift = $this->gift();
+        $guest = Guest::create(['name' => 'Joao', 'phone' => '11999998888']);
+
+        $this->actingAs($guest, 'guest');
+        $this->reserve($gift)->assertOk();
+
+        $this->assertDatabaseHas('gift_reservations', ['gift_id' => $gift->id, 'guest_id' => null]);
+    }
+
+    public function test_last_unit_second_request_conflicts(): void
+    {
+        $gift = $this->gift();
+
+        $this->reserve($gift)->assertOk();
+        $this->reserve($gift)
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Este presente ja foi reservado.');
 
         $this->assertDatabaseCount('gift_reservations', 1);
     }
 
-    public function test_a_gift_with_two_units_accepts_two_different_guests(): void
+    public function test_two_units_accept_two_anonymous_and_reject_third(): void
     {
         $gift = $this->gift(['quantity' => 2]);
 
-        $this->actingAs($this->guest('Joao', '11999998888'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertOk()
-            ->assertJsonPath('gift.is_available', true)
-            ->assertJsonPath('gift.available_count', 1);
-
-        $this->actingAs($this->guest('Maria', '11999997777'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertOk()
-            ->assertJsonPath('gift.is_available', false)
-            ->assertJsonPath('gift.available_count', 0);
-
-        $this->actingAs($this->guest('Ana', '11999996666'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertStatus(409);
+        $this->reserve($gift)->assertOk()->assertJsonPath('gift.available_count', 1);
+        $this->reserve($gift)->assertOk()->assertJsonPath('gift.available_count', 0);
+        $this->reserve($gift)->assertStatus(409);
 
         $this->assertDatabaseCount('gift_reservations', 2);
     }
 
-    public function test_the_same_guest_cannot_take_two_units_of_the_same_gift(): void
+    public function test_blank_name_becomes_null(): void
     {
-        $gift = $this->gift(['quantity' => 3]);
-        $guest = $this->guest();
+        $gift = $this->gift();
 
-        $this->actingAs($guest, 'guest')->postJson("/api/gifts/{$gift->id}/reserve")->assertOk();
+        $this->reserve($gift, ['giver_name' => '   '])
+            ->assertOk()
+            ->assertJsonPath('reservation.giver_name', null);
 
-        $this->actingAs($guest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
+        $this->assertDatabaseHas('gift_reservations', ['giver_name' => null]);
+    }
+
+    public function test_name_is_trimmed_and_limited(): void
+    {
+        $gift = $this->gift(['quantity' => 2]);
+
+        $this->reserve($gift, ['giver_name' => '  Maria  '])
+            ->assertOk()
+            ->assertJsonPath('reservation.giver_name', 'Maria');
+
+        $this->reserve($gift, ['giver_name' => str_repeat('a', 81)])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('giver_name');
+    }
+
+    public function test_show_name_without_name_is_coerced_to_false(): void
+    {
+        $gift = $this->gift();
+
+        $this->reserve($gift, ['show_name' => true])
+            ->assertOk()
+            ->assertJsonPath('reservation.show_name', false)
+            ->assertJsonPath('gift.given_by', []);
+
+        $this->assertDatabaseHas('gift_reservations', ['show_name' => false]);
+    }
+
+    public function test_name_hidden_unless_show_name_is_true(): void
+    {
+        $gift = $this->gift(['quantity' => 2]);
+
+        $this->reserve($gift, ['giver_name' => 'Joao Secreto', 'show_name' => false])->assertOk();
+
+        $response = $this->getJson('/api/gifts')->assertOk();
+        $this->assertSame([], $response->json('data.0.given_by'));
+        $this->assertStringNotContainsString('Joao Secreto', $response->getContent());
+
+        $this->reserve($gift, ['giver_name' => 'Maria Feliz', 'show_name' => true])
+            ->assertOk()
+            ->assertJsonPath('gift.given_by', ['Maria Feliz']);
+
+        $response = $this->getJson('/api/gifts')->assertOk();
+        $this->assertSame(['Maria Feliz'], $response->json('data.0.given_by'));
+        $this->assertStringNotContainsString('Joao Secreto', $response->getContent());
+    }
+
+    public function test_legacy_reservation_stays_in_given_by_and_admin_lists_all(): void
+    {
+        $gift = $this->gift(['quantity' => 2]);
+        $this->legacy($gift);
+        $this->reserve($gift, ['giver_name' => 'Anon'])->assertOk();
+
+        $this->assertSame(['Tia Legada'], $this->getJson('/api/gifts')->json('data.0.given_by'));
+
+        $admin = $this->admin();
+        $items = $this->actingAs($admin, 'admin')
+            ->getJson('/api/admin/gift-reservations')
+            ->assertOk()
+            ->json('data');
+
+        $byName = collect($items)->keyBy('giver_name');
+        $this->assertSame('11977776666', $byName['Tia Legada']['phone']);
+        $this->assertNull($byName['Anon']['phone']);
+        $this->assertArrayNotHasKey('guest', $items[0]);
+
+        $this->actingAs($admin, 'admin')
+            ->getJson('/api/admin/gifts')
+            ->assertOk();
+    }
+
+    public function test_public_list_never_exposes_phone_or_cancel_secrets(): void
+    {
+        $gift = $this->gift(['quantity' => 2]);
+        $this->legacy($gift);
+        $token = $this->reserve($gift, ['giver_name' => 'Ana', 'show_name' => true])
+            ->json('reservation.cancel_token');
+
+        $content = $this->getJson('/api/gifts')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('11977776666', $content);
+        $this->assertStringNotContainsString($token, $content);
+        $this->assertStringNotContainsString(hash('sha256', $token), $content);
+        $this->assertStringNotContainsString('cancel_token', $content);
+        $this->assertStringNotContainsString('phone', $content);
+    }
+
+    public function test_cancel_with_right_token_frees_the_unit(): void
+    {
+        $gift = $this->gift();
+        $data = $this->reserve($gift)->json('reservation');
+
+        $this->assertSame(40, strlen($data['cancel_token']));
+        $this->assertDatabaseMissing('gift_reservations', ['cancel_token_hash' => $data['cancel_token']]);
+
+        $this->postJson("/api/gift-reservations/{$data['id']}/cancel", ['cancel_token' => $data['cancel_token']])
+            ->assertNoContent();
+
+        $this->assertDatabaseCount('gift_reservations', 0);
+        $this->assertTrue($gift->fresh()->is_available);
+    }
+
+    public function test_cancel_with_wrong_or_missing_token_is_forbidden(): void
+    {
+        $gift = $this->gift();
+        $id = $this->reserve($gift)->json('reservation.id');
+
+        $this->postJson("/api/gift-reservations/{$id}/cancel", ['cancel_token' => 'errado'])->assertForbidden();
+        $this->postJson("/api/gift-reservations/{$id}/cancel")->assertForbidden();
+
+        $this->assertDatabaseCount('gift_reservations', 1);
+    }
+
+    public function test_cancel_legacy_reservation_without_hash_is_forbidden(): void
+    {
+        $legacy = $this->legacy($this->gift());
+
+        $this->postJson("/api/gift-reservations/{$legacy->id}/cancel", ['cancel_token' => 'qualquer'])
+            ->assertForbidden();
+        $this->postJson("/api/gift-reservations/{$legacy->id}/cancel", ['cancel_token' => ''])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('gift_reservations', 1);
+    }
+
+    public function test_cancel_paid_reservation_conflicts(): void
+    {
+        $gift = $this->gift();
+        $data = $this->reserve($gift)->json('reservation');
+        GiftReservation::first()->update(['status' => GiftReservation::STATUS_PAID, 'paid_at' => now()]);
+
+        $this->postJson("/api/gift-reservations/{$data['id']}/cancel", ['cancel_token' => $data['cancel_token']])
             ->assertStatus(409);
 
         $this->assertDatabaseCount('gift_reservations', 1);
     }
 
-    public function test_the_same_guest_can_reserve_two_different_gifts(): void
+    public function test_cancel_unknown_reservation_is_404(): void
     {
-        $first = $this->gift(['name' => 'Jogo de Panelas']);
-        $second = $this->gift(['name' => 'Jogo de Cama']);
-        $guest = $this->guest();
-
-        $this->actingAs($guest, 'guest')->postJson("/api/gifts/{$first->id}/reserve")->assertOk();
-        $this->actingAs($guest, 'guest')->postJson("/api/gifts/{$second->id}/reserve")->assertOk();
-
-        $this->assertDatabaseCount('gift_reservations', 2);
+        $this->postJson('/api/gift-reservations/999/cancel', ['cancel_token' => 'x'])->assertNotFound();
     }
 
-    public function test_a_free_amount_gift_requires_an_amount(): void
+    public function test_old_delete_route_is_gone(): void
     {
-        $gift = $this->gift(['is_free_amount' => true, 'price' => null]);
+        $gift = $this->gift();
 
-        $this->actingAs($this->guest(), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('amount');
+        $this->deleteJson("/api/gifts/{$gift->id}/reserve")->assertStatus(405);
     }
 
-    public function test_a_free_amount_gift_never_runs_out_and_sums_repeat_contributions(): void
+    public function test_free_amount_requires_amount_and_min_value(): void
     {
-        $gift = $this->gift(['is_free_amount' => true, 'price' => null]);
-        $guest = $this->guest();
+        $gift = $this->freeGift();
 
-        $this->actingAs($guest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 50])
-            ->assertOk()
-            ->assertJsonPath('reservation.amount', '50.00')
-            ->assertJsonPath('gift.is_available', true);
-
-        $this->actingAs($guest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 30])
-            ->assertOk()
-            ->assertJsonPath('reservation.amount', '80.00');
-
-        $this->actingAs($this->guest('Maria', '11999997777'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 20])
-            ->assertOk();
-
-        $this->assertDatabaseCount('gift_reservations', 2);
+        $this->reserve($gift)->assertStatus(422)->assertJsonValidationErrors('amount');
+        $this->reserve($gift, ['amount' => 0.5])->assertStatus(422)->assertJsonValidationErrors('amount');
     }
 
-    public function test_a_free_amount_gift_rejects_a_value_below_one_real(): void
-    {
-        $gift = $this->gift(['is_free_amount' => true, 'price' => null]);
-
-        $this->actingAs($this->guest(), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 0.5])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('amount');
-    }
-
-    public function test_the_reservation_returns_a_pix_payload_with_the_gift_amount(): void
+    public function test_free_amount_contributions_are_separate_pending_rows_with_pix(): void
     {
         WeddingSetting::current()->update([
             'bride_name' => 'Maria',
@@ -167,164 +290,69 @@ class GiftReservationTest extends TestCase
             'pix_merchant_name' => 'Joaquim e Maria',
             'pix_city' => 'Sao Paulo',
         ]);
+        $gift = $this->freeGift();
 
-        $gift = $this->gift(['price' => 25.00]);
-
-        $payload = $this->actingAs($this->guest(), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
+        $first = $this->reserve($gift, ['amount' => 50])
             ->assertOk()
-            ->json('reservation.pix_payload');
-
-        $this->assertStringContainsString('BR.GOV.BCB.PIX', $payload);
-        $this->assertStringContainsString('540525.00', $payload);
-        $this->assertStringContainsString('JOAQUIM E MARIA', $payload);
-    }
-
-    public function test_the_pix_payload_is_null_when_the_couple_has_no_key_configured(): void
-    {
-        $gift = $this->gift();
-
-        $this->actingAs($this->guest(), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
+            ->assertJsonPath('reservation.status', 'pending')
+            ->assertJsonPath('reservation.amount', '50.00')
+            ->assertJsonPath('gift.is_available', true)
+            ->json('reservation');
+        $second = $this->reserve($gift, ['amount' => 30])
             ->assertOk()
-            ->assertJsonPath('reservation.pix_payload', null);
+            ->assertJsonPath('reservation.amount', '30.00')
+            ->json('reservation');
+
+        $this->assertDatabaseCount('gift_reservations', 2);
+        $this->assertDatabaseHas('gift_reservations', ['status' => 'pending', 'amount' => 50, 'guest_id' => null]);
+        $this->assertStringContainsString('540550.00', $first['pix_payload']);
+        $this->assertStringContainsString('540530.00', $second['pix_payload']);
+        $this->assertStringContainsString('BR.GOV.BCB.PIX', $first['pix_payload']);
+        $this->assertNotSame($first['pix_payload'], $second['pix_payload']);
     }
 
-    public function test_guest_can_release_a_pending_reservation(): void
+    public function test_priced_gift_never_returns_pix_even_with_key_configured(): void
     {
-        $gift = $this->gift();
-        $guest = $this->guest();
+        WeddingSetting::current()->update(['pix_key' => '11999998888']);
 
-        $this->actingAs($guest, 'guest')->postJson("/api/gifts/{$gift->id}/reserve")->assertOk();
-
-        $this->actingAs($guest, 'guest')
-            ->deleteJson("/api/gifts/{$gift->id}/reserve")
-            ->assertNoContent();
-
-        $this->assertDatabaseCount('gift_reservations', 0);
-        $this->assertTrue($gift->fresh()->is_available);
-    }
-
-    public function test_guest_cannot_release_a_reservation_already_confirmed_by_the_couple(): void
-    {
-        $gift = $this->gift();
-        $guest = $this->guest();
-
-        $this->actingAs($guest, 'guest')->postJson("/api/gifts/{$gift->id}/reserve")->assertOk();
-        GiftReservation::first()->update(['status' => GiftReservation::STATUS_PAID, 'paid_at' => now()]);
-
-        $this->actingAs($guest, 'guest')
-            ->deleteJson("/api/gifts/{$gift->id}/reserve")
-            ->assertStatus(409);
-
-        $this->assertDatabaseCount('gift_reservations', 1);
-    }
-
-    public function test_guest_cannot_release_someone_elses_reservation(): void
-    {
-        $gift = $this->gift();
-
-        $this->actingAs($this->guest(), 'guest')->postJson("/api/gifts/{$gift->id}/reserve")->assertOk();
-
-        $this->actingAs($this->guest('Maria', '11999997777'), 'guest')
-            ->deleteJson("/api/gifts/{$gift->id}/reserve")
-            ->assertStatus(403);
-
-        $this->assertDatabaseCount('gift_reservations', 1);
-    }
-
-    public function test_public_gift_list_hides_reservation_identity(): void
-    {
-        $gift = $this->gift();
-
-        $this->actingAs($this->guest(), 'guest')->postJson("/api/gifts/{$gift->id}/reserve");
-
-        $response = $this->getJson('/api/gifts');
-
-        $response->assertOk();
-        $this->assertArrayNotHasKey('guest_id', $response->json('data.0'));
-        $this->assertArrayNotHasKey('reserved_by', $response->json('data.0'));
-        $this->assertArrayNotHasKey('reservations', $response->json('data.0'));
-    }
-
-    public function test_name_is_hidden_by_default(): void
-    {
-        $gift = $this->gift();
-
-        $this->actingAs($this->guest('Joao Secreto'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve")
-            ->assertOk()
-            ->assertJsonPath('reservation.show_name', false)
-            ->assertJsonPath('gift.given_by', []);
-
-        $response = $this->getJson('/api/gifts')->assertOk();
-        $this->assertSame([], $response->json('data.0.given_by'));
-        $this->assertStringNotContainsString('Joao Secreto', $response->getContent());
-        $this->assertDatabaseHas('gift_reservations', ['show_name' => false]);
-    }
-
-    public function test_name_is_listed_when_guest_opts_in(): void
-    {
-        $gift = $this->gift();
-
-        $this->actingAs($this->guest('Maria Feliz', '11988887777'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => true])
-            ->assertOk()
-            ->assertJsonPath('reservation.show_name', true)
-            ->assertJsonPath('gift.given_by', ['Maria Feliz'])
-            ->assertJsonPath('gift.reserved_count', 1);
-
-        $response = $this->getJson('/api/gifts')->assertOk();
-        $this->assertSame(['Maria Feliz'], $response->json('data.0.given_by'));
-        $this->assertSame(1, $response->json('data.0.reserved_count'));
-        $this->assertStringNotContainsString('11988887777', $response->getContent());
-    }
-
-    public function test_only_guests_who_opted_in_appear_in_given_by(): void
-    {
-        $gift = $this->gift(['quantity' => 2]);
-
-        $this->actingAs($this->guest('Anonimo', '11999990001'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => false])
-            ->assertOk();
-        $this->actingAs($this->guest('Visivel', '11999990002'), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => true])
-            ->assertOk()
-            ->assertJsonPath('gift.given_by', ['Visivel']);
-
-        $response = $this->getJson('/api/gifts')->assertOk();
-        $this->assertSame(['Visivel'], $response->json('data.0.given_by'));
-        $this->assertSame(2, $response->json('data.0.reserved_count'));
-        $this->assertStringNotContainsString('Anonimo', $response->getContent());
-    }
-
-    public function test_free_amount_repeat_contribution_updates_show_name(): void
-    {
-        $gift = $this->gift(['is_free_amount' => true, 'price' => null]);
-        $guest = $this->guest('Carlos');
-
-        $this->actingAs($guest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 50, 'show_name' => true])
-            ->assertOk()
-            ->assertJsonPath('gift.given_by', ['Carlos']);
-
-        $this->actingAs($guest, 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['amount' => 10, 'show_name' => false])
-            ->assertOk()
-            ->assertJsonPath('reservation.show_name', false)
-            ->assertJsonPath('gift.given_by', []);
-
-        $this->assertSame([], $this->getJson('/api/gifts')->json('data.0.given_by'));
+        $this->reserve($this->gift())->assertOk()->assertJsonPath('reservation.pix_payload', null);
     }
 
     public function test_show_name_must_be_boolean(): void
     {
-        $gift = $this->gift();
-
-        $this->actingAs($this->guest(), 'guest')
-            ->postJson("/api/gifts/{$gift->id}/reserve", ['show_name' => 'talvez'])
+        $this->reserve($this->gift(), ['show_name' => 'talvez'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('show_name');
+    }
+
+    public function test_admin_cannot_mark_a_reserved_reservation(): void
+    {
+        $this->reserve($this->gift());
+        $reservation = GiftReservation::first();
+        $admin = $this->admin();
+
+        $this->actingAs($admin, 'admin')
+            ->patchJson("/api/admin/gift-reservations/{$reservation->id}", ['status' => 'paid'])
+            ->assertStatus(422);
+
+        $this->assertSame('reserved', $reservation->fresh()->status);
+
+        $reservation->update(['status' => 'pending']);
+        $this->actingAs($admin, 'admin')
+            ->patchJson("/api/admin/gift-reservations/{$reservation->id}", ['status' => 'paid'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'paid');
+    }
+
+    public function test_throttle_returns_429(): void
+    {
+        $gift = $this->freeGift();
+
+        for ($i = 0; $i < 6; $i++) {
+            $this->reserve($gift, ['amount' => 5])->assertOk();
+        }
+
+        $this->reserve($gift, ['amount' => 5])->assertStatus(429);
     }
 
     public function test_public_settings_never_expose_the_pix_key(): void

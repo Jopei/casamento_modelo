@@ -26,7 +26,7 @@ class GiftResource extends JsonResource
                 ? $this->reservations
                     ->where('show_name', true)
                     ->sortBy('reserved_at')
-                    ->map(fn ($r) => $r->guest?->name)
+                    ->map(fn ($r) => $r->displayName())
                     ->filter()
                     ->values()
                     ->all()

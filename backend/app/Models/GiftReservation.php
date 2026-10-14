@@ -8,16 +8,24 @@ class GiftReservation extends Model
 {
     public const STATUS_PENDING = 'pending';
 
+    public const STATUS_RESERVED = 'reserved';
+
     public const STATUS_PAID = 'paid';
 
     protected $fillable = [
         'gift_id',
         'guest_id',
+        'giver_name',
+        'cancel_token_hash',
         'amount',
         'status',
         'show_name',
         'reserved_at',
         'paid_at',
+    ];
+
+    protected $hidden = [
+        'cancel_token_hash',
     ];
 
     protected function casts(): array
@@ -38,6 +46,14 @@ class GiftReservation extends Model
     public function guest()
     {
         return $this->belongsTo(Guest::class);
+    }
+
+    /**
+     * Nome informado pelo convidado ou, em reservas antigas, o do cadastro.
+     */
+    public function displayName(): ?string
+    {
+        return $this->giver_name ?? $this->guest?->name;
     }
 
     public function isPaid(): bool

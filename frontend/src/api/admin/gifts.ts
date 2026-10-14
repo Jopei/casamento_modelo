@@ -3,8 +3,8 @@ import type { ReservationStatus } from "../../types";
 
 export interface AdminGiftReservation {
   id: number;
-  guest_name: string;
-  guest_phone: string;
+  guest_name: string | null;
+  guest_phone: string | null;
   amount: string;
   status: ReservationStatus;
   reserved_at: string;

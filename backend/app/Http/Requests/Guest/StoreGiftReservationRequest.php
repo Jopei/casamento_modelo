@@ -25,6 +25,7 @@ class StoreGiftReservationRequest extends FormRequest
                 'min:1',
                 'max:999999.99',
             ],
+            'giver_name' => ['nullable', 'string', 'max:80'],
             'show_name' => ['sometimes', 'boolean'],
         ];
     }

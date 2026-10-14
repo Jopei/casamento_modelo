@@ -16,10 +16,8 @@ class GiftReservationResource extends JsonResource
                 'name' => $this->gift->name,
                 'is_free_amount' => $this->gift->is_free_amount,
             ],
-            'guest' => [
-                'name' => $this->guest->name,
-                'phone' => $this->guest->phone,
-            ],
+            'giver_name' => $this->displayName(),
+            'phone' => $this->guest?->phone,
             'amount' => $this->amount,
             'status' => $this->status,
             'show_name' => (bool) $this->show_name,

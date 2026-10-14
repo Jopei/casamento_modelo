@@ -22,6 +22,11 @@ Route::get('/schedule', [PublicController::class, 'schedule']);
 Route::get('/gallery', [PublicController::class, 'gallery']);
 Route::get('/gifts', [PublicController::class, 'gifts']);
 
+Route::post('/gifts/{gift}/reserve', [GuestGiftReservationController::class, 'store'])
+    ->middleware('throttle:gift-reserve');
+Route::post('/gift-reservations/{giftReservation}/cancel', [GuestGiftReservationController::class, 'cancel'])
+    ->middleware('throttle:20,1');
+
 Route::post('/guest/identify', [GuestAuthController::class, 'identify'])
     ->middleware('throttle:10,1');
 
@@ -34,9 +39,6 @@ Route::middleware('auth:guest')->group(function () {
     Route::post('/guest/logout', [GuestAuthController::class, 'logout']);
 
     Route::post('/rsvp', [GuestRsvpController::class, 'store']);
-
-    Route::post('/gifts/{gift}/reserve', [GuestGiftReservationController::class, 'store']);
-    Route::delete('/gifts/{gift}/reserve', [GuestGiftReservationController::class, 'destroy']);
 
     Route::post('/photos/{photo}/like', [PhotoInteractionController::class, 'like']);
     Route::delete('/photos/{photo}/like', [PhotoInteractionController::class, 'unlike']);

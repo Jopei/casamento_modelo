@@ -75,15 +75,18 @@ export interface Gift {
   given_by: string[];
 }
 
-export type ReservationStatus = "pending" | "paid";
+export type ReservationStatus = "reserved" | "pending" | "paid";
 
 export interface GiftReservationResult {
   id: number;
   amount: string;
   status: ReservationStatus;
-  /** Copia e cola do PIX. Nulo quando o casal ainda nao cadastrou a chave. */
+  /** Copia e cola do PIX. So existe no presente de valor livre. */
   pix_payload: string | null;
   show_name: boolean;
+  giver_name: string | null;
+  /** Autoriza o cancelamento; so vem nesta resposta. */
+  cancel_token: string;
 }
 
 export interface Guest {
@@ -104,7 +107,9 @@ export interface Rsvp {
 export interface GiftReservation {
   id: number;
   gift: { id: number; name: string; is_free_amount: boolean };
-  guest: { name: string; phone: string };
+  /** Nulos quando o convidado reservou sem se identificar. */
+  giver_name: string | null;
+  phone: string | null;
   amount: string;
   status: ReservationStatus;
   reserved_at: string;

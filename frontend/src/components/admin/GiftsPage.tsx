@@ -241,11 +241,17 @@ export function GiftsPage() {
                   <ul className="mt-2 flex flex-col gap-0.5">
                     {gift.reservations.map((reservation) => (
                       <li key={reservation.id} className="text-xs text-gold">
-                        {reservation.guest_name} ({reservation.guest_phone}) —{" "}
-                        {formatCurrency(reservation.amount)}
-                        {reservation.status === "paid"
-                          ? " · pago"
-                          : " · aguardando pagamento"}
+                        {reservation.guest_name ?? "Sem nome"}
+                        {reservation.guest_phone
+                          ? ` (${reservation.guest_phone})`
+                          : ""}
+                        {reservation.status === "reserved"
+                          ? " · reservado"
+                          : ` — ${formatCurrency(reservation.amount)}${
+                              reservation.status === "paid"
+                                ? " · pago"
+                                : " · aguardando pagamento"
+                            }`}
                       </li>
                     ))}
                   </ul>

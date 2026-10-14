@@ -25,8 +25,8 @@ class GiftAdminResource extends JsonResource
                 'reservations',
                 fn () => $this->reservations->map(fn ($reservation) => [
                     'id' => $reservation->id,
-                    'guest_name' => $reservation->guest->name,
-                    'guest_phone' => $reservation->guest->phone,
+                    'guest_name' => $reservation->displayName(),
+                    'guest_phone' => $reservation->guest?->phone,
                     'amount' => $reservation->amount,
                     'status' => $reservation->status,
                     'reserved_at' => $reservation->reserved_at,

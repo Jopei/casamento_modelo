@@ -13,17 +13,28 @@ export async function fetchGifts(): Promise<Gift[]> {
 
 export async function reserveGift(
   giftId: number,
-  { amount, showName }: { amount?: number; showName: boolean },
+  {
+    giverName,
+    showName,
+    amount,
+  }: { giverName: string | null; showName: boolean; amount?: number },
 ): Promise<ReserveGiftResponse> {
   const { data } = await api.post<ReserveGiftResponse>(
     `/gifts/${giftId}/reserve`,
-    amount === undefined
-      ? { show_name: showName }
-      : { amount, show_name: showName },
+    {
+      giver_name: giverName,
+      show_name: showName,
+      ...(amount === undefined ? {} : { amount }),
+    },
   );
   return data;
 }
 
-export async function releaseGift(giftId: number): Promise<void> {
-  await api.delete(`/gifts/${giftId}/reserve`);
+export async function cancelReservation(
+  reservationId: number,
+  cancelToken: string,
+): Promise<void> {
+  await api.post(`/gift-reservations/${reservationId}/cancel`, {
+    cancel_token: cancelToken,
+  });
 }
