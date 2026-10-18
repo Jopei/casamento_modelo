@@ -81,8 +81,6 @@ export interface GiftReservationResult {
   id: number;
   amount: string;
   status: ReservationStatus;
-  /** Copia e cola do PIX. So existe no presente de valor livre. */
-  pix_payload: string | null;
   show_name: boolean;
   giver_name: string | null;
   /** Autoriza o cancelamento; so vem nesta resposta. */

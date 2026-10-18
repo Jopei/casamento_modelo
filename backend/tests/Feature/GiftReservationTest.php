@@ -69,7 +69,6 @@ class GiftReservationTest extends TestCase
             ->assertJsonPath('gift.is_available', false)
             ->assertJsonPath('reservation.status', 'reserved')
             ->assertJsonPath('reservation.amount', '250.00')
-            ->assertJsonPath('reservation.pix_payload', null)
             ->assertJsonPath('reservation.giver_name', null)
             ->assertJsonPath('reservation.show_name', false)
             ->assertJsonStructure(['reservation' => ['id', 'cancel_token']]);
@@ -272,50 +271,56 @@ class GiftReservationTest extends TestCase
         $this->deleteJson("/api/gifts/{$gift->id}/reserve")->assertStatus(405);
     }
 
-    public function test_free_amount_requires_amount_and_min_value(): void
+    public function test_free_amount_gift_reserves_without_amount_and_without_pix(): void
     {
         $gift = $this->freeGift();
 
-        $this->reserve($gift)->assertStatus(422)->assertJsonValidationErrors('amount');
-        $this->reserve($gift, ['amount' => 0.5])->assertStatus(422)->assertJsonValidationErrors('amount');
+        $response = $this->reserve($gift)
+            ->assertOk()
+            ->assertJsonPath('reservation.status', 'reserved')
+            ->assertJsonPath('reservation.amount', '0.00')
+            ->assertJsonPath('gift.is_available', false);
+
+        $this->assertArrayNotHasKey('pix_payload', $response->json('reservation'));
+        $this->assertDatabaseHas('gift_reservations', ['gift_id' => $gift->id, 'status' => 'reserved', 'guest_id' => null]);
     }
 
-    public function test_free_amount_contributions_are_separate_pending_rows_with_pix(): void
+    public function test_free_amount_gift_second_reservation_conflicts_when_quantity_is_one(): void
     {
-        WeddingSetting::current()->update([
-            'bride_name' => 'Maria',
-            'groom_name' => 'Joaquim',
-            'wedding_date' => now()->addMonth(),
-            'pix_key' => '11999998888',
-            'pix_merchant_name' => 'Joaquim e Maria',
-            'pix_city' => 'Sao Paulo',
-        ]);
         $gift = $this->freeGift();
 
-        $first = $this->reserve($gift, ['amount' => 50])
-            ->assertOk()
-            ->assertJsonPath('reservation.status', 'pending')
-            ->assertJsonPath('reservation.amount', '50.00')
-            ->assertJsonPath('gift.is_available', true)
-            ->json('reservation');
-        $second = $this->reserve($gift, ['amount' => 30])
-            ->assertOk()
-            ->assertJsonPath('reservation.amount', '30.00')
-            ->json('reservation');
+        $this->reserve($gift)->assertOk();
+        $this->reserve($gift)
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Este presente ja foi reservado.');
 
-        $this->assertDatabaseCount('gift_reservations', 2);
-        $this->assertDatabaseHas('gift_reservations', ['status' => 'pending', 'amount' => 50, 'guest_id' => null]);
-        $this->assertStringContainsString('540550.00', $first['pix_payload']);
-        $this->assertStringContainsString('540530.00', $second['pix_payload']);
-        $this->assertStringContainsString('BR.GOV.BCB.PIX', $first['pix_payload']);
-        $this->assertNotSame($first['pix_payload'], $second['pix_payload']);
+        $this->assertDatabaseCount('gift_reservations', 1);
     }
 
-    public function test_priced_gift_never_returns_pix_even_with_key_configured(): void
+    public function test_legacy_pending_reservation_of_free_amount_gift_counts_as_reserved(): void
+    {
+        $gift = $this->freeGift();
+        $this->legacy($gift);
+
+        $this->assertFalse($gift->fresh()->is_available);
+        $this->reserve($gift)->assertStatus(409);
+    }
+
+    public function test_amount_in_body_is_ignored_and_pix_never_returned(): void
     {
         WeddingSetting::current()->update(['pix_key' => '11999998888']);
 
-        $this->reserve($this->gift())->assertOk()->assertJsonPath('reservation.pix_payload', null);
+        $priced = $this->reserve($this->gift(), ['amount' => 1])
+            ->assertOk()
+            ->assertJsonPath('reservation.amount', '250.00');
+        $free = $this->reserve($this->freeGift(), ['amount' => 50])
+            ->assertOk()
+            ->assertJsonPath('reservation.amount', '0.00');
+
+        foreach ([$priced, $free] as $response) {
+            $this->assertArrayNotHasKey('pix_payload', $response->json('reservation'));
+            $this->assertStringNotContainsString('pix_payload', $response->getContent());
+        }
     }
 
     public function test_show_name_must_be_boolean(): void
@@ -346,13 +351,13 @@ class GiftReservationTest extends TestCase
 
     public function test_throttle_returns_429(): void
     {
-        $gift = $this->freeGift();
+        $gift = $this->gift(['quantity' => 10]);
 
         for ($i = 0; $i < 6; $i++) {
-            $this->reserve($gift, ['amount' => 5])->assertOk();
+            $this->reserve($gift)->assertOk();
         }
 
-        $this->reserve($gift, ['amount' => 5])->assertStatus(429);
+        $this->reserve($gift)->assertStatus(429);
     }
 
     public function test_public_settings_never_expose_the_pix_key(): void

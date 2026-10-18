@@ -58,6 +58,6 @@ class Gift extends Model
 
     public function getIsAvailableAttribute(): bool
     {
-        return $this->is_free_amount || $this->available_count > 0;
+        return $this->available_count > 0;
     }
 }

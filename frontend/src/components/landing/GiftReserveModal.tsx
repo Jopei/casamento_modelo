@@ -120,7 +120,7 @@ export function GiftReserveModal({
                 type="submit"
                 className="mt-2 rounded-full bg-gold px-6 py-3 text-sm uppercase tracking-wide text-offwhite transition-colors hover:bg-gold-light"
               >
-                {gift.is_free_amount ? "Continuar" : "Reservar presente"}
+                Vou levar este presente
               </button>
               <button
                 type="button"

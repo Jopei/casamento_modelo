@@ -8,7 +8,7 @@ interface GiftReservedModalProps {
   onCancelReservation: () => Promise<void>;
 }
 
-/** Confirmacao do presente com preco: reservado, sem pagamento. */
+/** Confirmacao da reserva do presente. */
 export function GiftReservedModal({
   gift,
   onClose,

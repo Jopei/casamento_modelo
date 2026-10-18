@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { GiftList } from "../components/landing/GiftList";
-import { GiftAmountModal } from "../components/landing/GiftAmountModal";
 import { GiftReserveModal } from "../components/landing/GiftReserveModal";
 import { GiftReservedModal } from "../components/landing/GiftReservedModal";
-import { GiftPixModal } from "../components/landing/GiftPixModal";
 import { cancelReservation, fetchGifts, reserveGift } from "../api/gifts";
 import type { Gift, GiftReservationResult } from "../types";
 
@@ -15,11 +13,6 @@ export function GiftsPage() {
   const [askingReserveFor, setAskingReserveFor] = useState<Gift | null>(
     null,
   );
-  const [askingAmountFor, setAskingAmountFor] = useState<{
-    gift: Gift;
-    giverName: string | null;
-    showName: boolean;
-  } | null>(null);
   const [selected, setSelected] = useState<{
     gift: Gift;
     reservation: GiftReservationResult;
@@ -35,7 +28,6 @@ export function GiftsPage() {
     gift: Gift,
     giverName: string | null,
     showName: boolean,
-    amount?: number,
   ) => {
     setError(null);
     setPendingGiftId(gift.id);
@@ -44,7 +36,6 @@ export function GiftsPage() {
       const { gift: updated, reservation } = await reserveGift(gift.id, {
         giverName,
         showName,
-        amount,
       });
 
       setGifts((current) =>
@@ -78,18 +69,7 @@ export function GiftsPage() {
     setAskingReserveFor(null);
     if (!gift) return;
 
-    if (gift.is_free_amount) {
-      setAskingAmountFor({ gift, giverName, showName });
-      return;
-    }
-
     reserve(gift, giverName, showName);
-  };
-
-  const handleConfirmAmount = (amount: number) => {
-    const asking = askingAmountFor;
-    setAskingAmountFor(null);
-    if (asking) reserve(asking.gift, asking.giverName, asking.showName, amount);
   };
 
   const handleCancelReservation = async () => {
@@ -126,19 +106,8 @@ export function GiftsPage() {
         onClose={() => setAskingReserveFor(null)}
         onConfirm={handleConfirmReserve}
       />
-      <GiftAmountModal
-        gift={askingAmountFor?.gift ?? null}
-        onClose={() => setAskingAmountFor(null)}
-        onConfirm={handleConfirmAmount}
-      />
       <GiftReservedModal
-        gift={selected && !selected.gift.is_free_amount ? selected.gift : null}
-        onClose={() => setSelected(null)}
-        onCancelReservation={handleCancelReservation}
-      />
-      <GiftPixModal
-        gift={selected?.gift.is_free_amount ? selected.gift : null}
-        reservation={selected?.reservation ?? null}
+        gift={selected?.gift ?? null}
         onClose={() => setSelected(null)}
         onCancelReservation={handleCancelReservation}
       />

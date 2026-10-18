@@ -13,18 +13,13 @@ export async function fetchGifts(): Promise<Gift[]> {
 
 export async function reserveGift(
   giftId: number,
-  {
-    giverName,
-    showName,
-    amount,
-  }: { giverName: string | null; showName: boolean; amount?: number },
+  { giverName, showName }: { giverName: string | null; showName: boolean },
 ): Promise<ReserveGiftResponse> {
   const { data } = await api.post<ReserveGiftResponse>(
     `/gifts/${giftId}/reserve`,
     {
       giver_name: giverName,
       show_name: showName,
-      ...(amount === undefined ? {} : { amount }),
     },
   );
   return data;
